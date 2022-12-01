@@ -1,7 +1,7 @@
 from datetime import datetime
 import requests as rq
 
-from database import Show
+from common import Show
 
 
 def scrape_lost_well():
