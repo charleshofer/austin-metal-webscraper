@@ -1,0 +1,1 @@
+[{"name": "Death File Red", "genre": "Old School"}, {"name": "Yatra", "genre": "Death Metal"}, {"name": "Whore of Bethlehem", "genre": "Brutal"}, {"name": "Cathexis", "genre": "Technical"}, {"name": "Martyred", "genre": "Brutal"}, {"name": "Noisy Neighbors", "genre": "Grindcore"}, {"name": "Deocculted", "genre": "Death Metal"}]
