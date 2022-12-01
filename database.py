@@ -39,10 +39,14 @@ class Show:
         self.bands = bands
 
     def __str__(self):
-        return (
-            "Show(title='{}', show_date={}, show_time={}, door_time={}, venue={}, bands={}, id={})".format(
-                self.title, self.show_date, self.show_time, self.door_time, self.venue, self.bands, self.db_id
-            )
+        return "Show(title='{}', show_date={}, show_time={}, door_time={}, venue={}, bands={}, id={})".format(
+            self.title,
+            self.show_date,
+            self.show_time,
+            self.door_time,
+            self.venue,
+            self.bands,
+            self.db_id,
         )
 
     def __repr__(self):
@@ -56,7 +60,7 @@ def _show_to_tuple(show):
         show.show_time.isoformat() if show.show_time is not None else None,
         show.door_time.isoformat() if show.show_time is not None else None,
         show.venue,
-        json.dumps(show.bands)
+        json.dumps(show.bands),
     )
 
 
@@ -100,7 +104,10 @@ def get_bands():
     con = _get_connection()
     with con:
         result_set = con.execute("SELECT id, name, genre FROM bands")
-        return [Band(name=name, genre=genre, db_id=db_id) for db_id, name, genre in result_set.fetchall()]
+        return [
+            Band(name=name, genre=genre, db_id=db_id)
+            for db_id, name, genre in result_set.fetchall()
+        ]
 
 
 def upsert_shows(shows):
@@ -130,7 +137,7 @@ def get_shows():
                 door_time=datetime.fromisoformat(door_time) if door_time is not None else None,
                 venue=venue,
                 bands=json.loads(bands),
-                db_id=db_id
+                db_id=db_id,
             )
             for title, show_date, door_time, show_time, venue, bands, db_id in result_set.fetchall()
         ]
