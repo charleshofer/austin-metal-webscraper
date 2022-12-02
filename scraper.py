@@ -1,7 +1,21 @@
 from datetime import datetime
+from functools import partial
+import logging
+import os
+import pprint
+import re
 import requests as rq
+from requests_oauthlib import OAuth2Session
 
 from common import Show
+
+logging.basicConfig()
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+# Regex to split up show titles and descriptions to find band names. For example: Lost Well will list the bands in
+# their event titles, like "Death File Red, Bruka, Ungrieved"
+SPLIT_TOKENS = ",|:|/"
 
 
 def scrape_lost_well():
@@ -49,6 +63,7 @@ def scrape_lost_well():
 
     response_data = response.json()
     events_list = response_data.get("project").get("data").get("events")
+    logger.info("Found %i total events at The Lost Well", len(events_list))
 
     shows = []
     for event in events_list:
@@ -59,8 +74,71 @@ def scrape_lost_well():
                 show_time=None,
                 door_time=None,
                 venue="The Lost Well",
-                bands=[b.strip() for b in event.get("title").split(",")],
+                bands=[b.strip() for b in re.split(SPLIT_TOKENS, event.get("title"))],
             )
         )
 
     return shows
+
+
+def scrape_catil():
+    # Get the API key from the environment
+    oauth_token = os.environ.get("EVENTBRITE_TOKEN")
+    pagination_token = "start"
+    shows = []
+
+    while pagination_token is not None:
+        # Set up the URL, adding a continuation/pagination token if this isn't the first page
+        url = "https://www.eventbriteapi.com/v3/venues/28302591/events?expand=music_properties&token={}".format(oauth_token)
+        if pagination_token != "start":
+            url += "&continuation={}".format(pagination_token)
+
+        # Get the response and unpack it
+        response = rq.get(url)
+        response_data = response.json()
+        events_list = response_data.get("events")
+        page_info = response_data.get("pagination")
+
+        logger.info(
+            "Found %i events on page %i of %i for Come and Take It Live",
+            len(events_list),
+            page_info.get("page_number"),
+            page_info.get("page_count")
+        )
+
+        # Go through every event, and create a Show object for it
+        for event in events_list:
+            bands = _catil_band_parse(event.get("name").get("text"))
+            if bands:
+                shows.append(
+                    Show(
+                        title=event.get("name").get("text"),
+                        show_date=datetime.strptime(event.get("start").get("local"), "%Y-%m-%dT%H:%M:%S"),
+                        show_time=datetime.strptime(event.get("start").get("local"), "%Y-%m-%dT%H:%M:%S"),
+                        door_time=None,
+                        venue="Come and Take It Live",
+                        bands=bands,
+                    )
+                )
+
+        # Set the new pagination token
+        pagination_token = page_info.get("continuation")
+
+    logger.info("Found %i total events at Come and Take It Live", len(shows))
+    return shows
+
+
+def _catil_band_parse(event_title):
+    # Break apart the event title to get the bands.
+    # TODO: Right now we just band on the fact that CATIL adds every band to the event title. But this is not the case
+    #  even half the time.
+    bands = [b.strip() for b in re.split(SPLIT_TOKENS, event_title)]
+    # Remove any empty strings
+    bands = filter(lambda s: s != "", bands)
+    return list(bands)
+
+
+if __name__ == "__main__":
+    shows = scrape_catil()
+    pprint.pp(shows)
+
