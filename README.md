@@ -9,8 +9,9 @@ one place where you can filter by subgenre.
   Eventually, it'd be nice to pull from all of the following:
     * [DONE] The Lost Well
     * [DONE] Come and Take It Live
+    * [DONE] Mohawk
     * Chess Club
-    * Spiderhouse Ballroom
+    * [DONE] Spiderhouse Ballroom
     * Valhalla on Red River
 * Store show information in a SQL database
 * [TODO] Generate various types of calendars from the show database.
@@ -21,7 +22,8 @@ one place where you can filter by subgenre.
 * [TODO] Email or SMS notification features
     * Notifications for specific bands
     * Weekly or monthly email detailing all shows for the coming period
-    
+* [TODO] Pull a list of all death metal bands from Metal Archives
+
 ## Setup
 
 We use `pipenv`. Run `pipenv sync` to get your Python environment setup.

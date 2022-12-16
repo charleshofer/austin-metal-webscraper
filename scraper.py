@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from functools import partial
 import logging
@@ -14,8 +15,9 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 # Regex to split up show titles and descriptions to find band names. For example: Lost Well will list the bands in
-# their event titles, like "Death File Red, Bruka, Ungrieved"
-SPLIT_TOKENS = ",|:|/"
+# their event titles, like "Death File Red, Bruka, Ungrieved".
+# TODO: Death metal bands don't usually include these characters in their names, but we need a way to handle exceptions
+SPLIT_TOKENS = ",|:|/|&"
 
 
 def scrape_lost_well():
@@ -95,6 +97,7 @@ def scrape_catil():
 
         # Get the response and unpack it
         response = rq.get(url)
+        response.raise_for_status()
         response_data = response.json()
         events_list = response_data.get("events")
         page_info = response_data.get("pagination")
@@ -124,7 +127,6 @@ def scrape_catil():
         # Set the new pagination token
         pagination_token = page_info.get("continuation")
 
-    logger.info("Found %i total events at Come and Take It Live", len(shows))
     return shows
 
 
@@ -135,10 +137,75 @@ def _catil_band_parse(event_title):
     bands = [b.strip() for b in re.split(SPLIT_TOKENS, event_title)]
     # Remove any empty strings
     bands = filter(lambda s: s != "", bands)
+    # Remove "and" and "&" from bands at the end of the list
+    bands = filter(lambda s: s.replace("&", "").replace("and", "").strip(), bands)
     return list(bands)
 
 
+def scrape_mohawk():
+    return _scrape_prekindle("Mohawk", "https://www.prekindle.com/api/events/organizer/531433527670566235")
+
+
+def scrape_ballroom():
+    return _scrape_prekindle("The Ballroom", "https://www.prekindle.com/api/events/organizer/531433527847976172")
+
+
+def scrape_metal_archives():
+    # TODO: MA isn't the most well-built site. I'm getting a 403 from every MA request I get, but it still returns the
+    #   start of the data. Kind of deceptive. Figure out how to not get 403s.
+    headers = {
+        "authority": "www.metal-archives.com",
+    }
+    resp = rq.get(
+        "https://www.metal-archives.com/search/ajax-advanced/searching/bands/?bandName=&genre=Death+Metal&country=&yearCreationFrom=&yearCreationTo=&bandNotes=&status=&themes=&location=&bandLabelName=&sEcho=1&iColumns=3&sColumns=&iDisplayStart=500&iDisplayLength=200&mDataProp_0=0&mDataProp_1=1&mDataProp_2=2&_=1671215632964",
+        headers=headers
+    )
+    #resp = rq.get("https://www.metal-archives.com/browse/ajax-genre/g/death/json/1?sEcho=2&iColumns=4&sColumns=&iDisplayStart=500&iDisplayLength=500&mDataProp_0=0&mDataProp_1=1&mDataProp_2=2&mDataProp_3=3&iSortCol_0=0&sSortDir_0=asc&iSortingCols=1&bSortable_0=true&bSortable_1=true&bSortable_2=true&bSortable_3=false")
+    print(resp.ok)
+    print(resp.status_code)
+    print(resp.text[:1000])
+    #pprint(resp.json())
+
+
+def _scrape_prekindle(venue, url):
+    # Send the request
+    resp = rq.get(url)
+
+    # Remove the jQuery callback from the response and load the JSON it contains
+    resp_text = resp.text
+    resp_text = resp_text.replace("callback(", "")
+    resp_text = resp_text[:-1]
+    resp_data = json.loads(resp_text)
+
+    pprint.pp(resp_data)
+
+    # Get turn the response data into Show objects
+    shows = []
+    for event in resp_data.get("events", []):
+        bands = event.get("lineup")
+        # Sometimes venues don't fill out the 'lineup' property. Try to compensate for this by just adding the title
+        # of the event as a band. Sometimes venues will just list the headliner. It's not a big deal if we have
+        # nonsense band names that are actually event names (like 'Summer Slaughter Tour'), because we filter
+        # out the bands we don't care about.
+        if bands is None or bands == []:
+            bands += [b.strip() for b in re.split(SPLIT_TOKENS, event.get("title"))]
+        if bands:
+            show_date = datetime.strptime(event.get("date"), "%m/%d/%Y")
+            show_time = datetime.combine(date=show_date, time=datetime.strptime(event.get("time"), "%I:%M%p").time())
+            door_time = datetime.combine(date=show_date, time=datetime.strptime(event.get("doorsTime"), "%I:%M%p").time())
+            shows.append(
+                Show(
+                    title=event.get("title"),
+                    show_date=show_date,
+                    show_time=show_time,
+                    door_time=door_time,
+                    venue=venue,
+                    bands=bands,
+                )
+            )
+    return shows
+
+
 if __name__ == "__main__":
-    shows = scrape_catil()
-    pprint.pp(shows)
+    pprint.pp(scrape_lost_well())
 
